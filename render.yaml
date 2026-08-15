@@ -1,11 +1,21 @@
 # yaml-language-server: $schema=https://render.com/schema/render.yaml.json
 #
-# Dify on Render: one-click gallery template
-# Repo: https://github.com/render-examples/dify-render-template
-# Upstream: https://github.com/langgenius/dify
-# Images: https://hub.docker.com/u/langgenius
+# Dify on Render — production build for Vedic Samhita
+# Base: render-examples/dify-render-template (official langgenius/* images)
 #
-# Pattern: image-wrapper (official langgenius/* images; no source build on Render)
+# Deviations from the stock template, and why:
+#   1. STORAGE_TYPE=s3 (Cloudflare R2) and NO disk on dify-api — a Render
+#      disk pins the service to one instance and disables zero-downtime
+#      deploys; with S3 the disk goes and deploys overlap.
+#   2. dify-worker uses the SAME S3 storage — api and worker must be
+#      storage twins or background jobs write files into a void.
+#   3. dify-db on basic-1gb — 256 MB cannot hold app state + pgvector.
+#   4. dify-plugin-daemon + dify-plugin-db added — in Dify 1.x the OpenAI
+#      provider and the Agent (FunctionCalling) strategy are marketplace
+#      plugins; only the daemon can install and run them.
+#
+# VERSION PAIRING (load-bearing — never bump one side alone):
+#   langgenius/dify-api:1.14.2  ⇔  langgenius/dify-plugin-daemon:0.6.1-local
 
 previews:
   generation: off
@@ -15,7 +25,7 @@ projects:
     environments:
       - name: production
         services:
-          # API (Flask + Celery broker client)
+          # ── API (Flask + Celery broker client) ─────────────────────────
           - type: web
             name: dify-api
             runtime: image
@@ -26,10 +36,8 @@ projects:
             healthCheckPath: /health
             autoDeployTrigger: off
             initialDeployHook: psql $DATABASE_URL -c 'CREATE EXTENSION IF NOT EXISTS vector;'
-            disk:
-              name: dify-api-storage
-              mountPath: /app/api/storage
-              sizeGB: 10
+            # NO disk: block. Files live in R2; the disk would re-disable
+            # zero-downtime deploys.
             envVars:
               - key: MODE
                 value: api
@@ -132,14 +140,47 @@ projects:
                 fromDatabase:
                   name: dify-db
                   property: database
+              # ── File storage: Cloudflare R2 (S3-compatible) ──
+              # ENDPOINT IS THE ACCOUNT URL ONLY — the client appends the
+              # bucket from S3_BUCKET_NAME. Bucket-in-endpoint doubles the
+              # path and every upload 404s.
               - key: STORAGE_TYPE
-                value: opendal
-              - key: OPENDAL_SCHEME
-                value: fs
-              - key: OPENDAL_FS_ROOT
-                value: /app/api/storage
+                value: s3
+              - key: S3_ENDPOINT
+                value: https://2d12c215c359a578259dc22a1b61b619.r2.cloudflarestorage.com
+              - key: S3_BUCKET_NAME
+                value: dify-prod-storage
+              - key: S3_ACCESS_KEY
+                sync: false          # prompted at apply; never in git
+              - key: S3_SECRET_KEY
+                sync: false
+              - key: S3_REGION
+                value: auto          # R2 convention
+              - key: S3_USE_AWS_MANAGED_IAM
+                value: "false"
+              # ── Plugin daemon wiring ──
+              - key: PLUGIN_DAEMON_URL
+                value: http://dify-plugin-daemon:5002
+              - key: PLUGIN_DAEMON_KEY
+                fromService:
+                  name: dify-plugin-daemon
+                  type: pserv
+                  envVarKey: SERVER_KEY
+              - key: INNER_API_KEY_FOR_PLUGIN
+                fromService:
+                  name: dify-plugin-daemon
+                  type: pserv
+                  envVarKey: DIFY_INNER_API_KEY
+              - key: PLUGIN_DAEMON_TIMEOUT
+                value: "600.0"
+              - key: MARKETPLACE_ENABLED
+                value: "true"
+              - key: MARKETPLACE_API_URL
+                value: https://marketplace.dify.ai
+              - key: MARKETPLACE_URL
+                value: https://marketplace.dify.ai
 
-          # Celery worker
+          # ── Celery worker ──────────────────────────────────────────────
           - type: worker
             name: dify-worker
             runtime: image
@@ -219,14 +260,52 @@ projects:
                 fromDatabase:
                   name: dify-db
                   property: database
+              # ── File storage: IDENTICAL to dify-api, by reference ──
+              # A worker on opendal/fs writes to its own ephemeral
+              # filesystem — files the api can never see, gone on restart.
               - key: STORAGE_TYPE
-                value: opendal
-              - key: OPENDAL_SCHEME
-                value: fs
-              - key: OPENDAL_FS_ROOT
-                value: /app/api/storage
+                value: s3
+              - key: S3_ENDPOINT
+                value: https://2d12c215c359a578259dc22a1b61b619.r2.cloudflarestorage.com
+              - key: S3_BUCKET_NAME
+                value: dify-prod-storage
+              - key: S3_ACCESS_KEY
+                fromService:
+                  name: dify-api
+                  type: web
+                  envVarKey: S3_ACCESS_KEY
+              - key: S3_SECRET_KEY
+                fromService:
+                  name: dify-api
+                  type: web
+                  envVarKey: S3_SECRET_KEY
+              - key: S3_REGION
+                value: auto
+              - key: S3_USE_AWS_MANAGED_IAM
+                value: "false"
+              # ── Plugin daemon wiring (worker runs the async half) ──
+              - key: PLUGIN_DAEMON_URL
+                value: http://dify-plugin-daemon:5002
+              - key: PLUGIN_DAEMON_KEY
+                fromService:
+                  name: dify-plugin-daemon
+                  type: pserv
+                  envVarKey: SERVER_KEY
+              - key: INNER_API_KEY_FOR_PLUGIN
+                fromService:
+                  name: dify-plugin-daemon
+                  type: pserv
+                  envVarKey: DIFY_INNER_API_KEY
+              - key: PLUGIN_DAEMON_TIMEOUT
+                value: "600.0"
+              - key: MARKETPLACE_ENABLED
+                value: "true"
+              - key: MARKETPLACE_API_URL
+                value: https://marketplace.dify.ai
+              - key: MARKETPLACE_URL
+                value: https://marketplace.dify.ai
 
-          # Web console (Next.js)
+          # ── Web console (Next.js) ──────────────────────────────────────
           - type: web
             name: dify-web
             runtime: image
@@ -246,8 +325,89 @@ projects:
                   name: dify-api
                   type: web
                   envVarKey: RENDER_EXTERNAL_URL
+              - key: MARKETPLACE_API_URL
+                value: https://marketplace.dify.ai
+              - key: MARKETPLACE_URL
+                value: https://marketplace.dify.ai
 
-          # Key Value (Celery broker + cache)
+          # ── Plugin daemon (installs & runs marketplace plugins) ────────
+          # Private service: reachable only on Render's internal network.
+          # Your apps need langgenius/openai (26 LLM nodes) and
+          # langgenius/agent 0.0.42 (FunctionCalling) — both install
+          # through this daemon or not at all.
+          - type: pserv
+            name: dify-plugin-daemon
+            runtime: image
+            plan: standard        # builds Python envs per plugin; 512MB OOMs
+            region: oregon
+            image:
+              url: docker.io/langgenius/dify-plugin-daemon:0.6.1-local
+            autoDeployTrigger: off
+            # Disk stays HERE (plugins are reinstallable; api's disk was the
+            # one that cost us zero-downtime deploys on the user path).
+            disk:
+              name: dify-plugin-storage
+              mountPath: /app/storage
+              sizeGB: 5
+            envVars:
+              - key: SERVER_PORT
+                value: "5002"
+              # Shared secret #1 — api/worker read this back as
+              # PLUGIN_DAEMON_KEY. Generated once, here, so no drift.
+              - key: SERVER_KEY
+                generateValue: true
+              # Shared secret #2 — the daemon calls the api back with this.
+              - key: DIFY_INNER_API_KEY
+                generateValue: true
+              - key: DIFY_INNER_API_URL
+                value: http://dify-api:5001
+              # ── its own database (the daemon insists) ──
+              - key: DB_HOST
+                fromDatabase:
+                  name: dify-plugin-db
+                  property: host
+              - key: DB_PORT
+                fromDatabase:
+                  name: dify-plugin-db
+                  property: port
+              - key: DB_USERNAME
+                fromDatabase:
+                  name: dify-plugin-db
+                  property: user
+              - key: DB_PASSWORD
+                fromDatabase:
+                  name: dify-plugin-db
+                  property: password
+              - key: DB_DATABASE
+                fromDatabase:
+                  name: dify-plugin-db
+                  property: database
+              - key: DB_SSL_MODE
+                value: require     # Render Postgres refuses plaintext
+              # ── plugin storage layout (must agree with mountPath) ──
+              - key: PLUGIN_STORAGE_TYPE
+                value: local
+              - key: PLUGIN_STORAGE_LOCAL_ROOT
+                value: /app/storage
+              - key: PLUGIN_WORKING_PATH
+                value: /app/storage/cwd
+              - key: PLUGIN_INSTALLED_PATH
+                value: plugin
+              - key: PLUGIN_PACKAGE_CACHE_PATH
+                value: plugin_packages
+              - key: PLUGIN_MEDIA_CACHE_PATH
+                value: assets
+              # Marketplace packages are signed; leave verification on.
+              - key: FORCE_VERIFYING_SIGNATURE
+                value: "true"
+              # Provider install builds a Python env; default 120s is tight
+              # on shared compute and fails as a mystery "install failed".
+              - key: PYTHON_ENV_INIT_TIMEOUT
+                value: "300"
+              - key: PLUGIN_MAX_EXECUTION_TIMEOUT
+                value: "600"
+
+          # ── Key Value (Celery broker + cache) ──────────────────────────
           - type: keyvalue
             name: dify-kv
             plan: starter
@@ -257,8 +417,18 @@ projects:
 
         databases:
           - name: dify-db
-            plan: basic-256mb
+            plan: basic-1gb
             region: oregon
             databaseName: dify
+            postgresMajorVersion: "16"
+            ipAllowList: []
+
+          # The plugin daemon's private database. Separate instance rather
+          # than a second DB inside dify-db: Render's managed Postgres user
+          # is not a superuser and may refuse CREATE DATABASE.
+          - name: dify-plugin-db
+            plan: basic-256mb
+            region: oregon
+            databaseName: dify_plugin
             postgresMajorVersion: "16"
             ipAllowList: []
