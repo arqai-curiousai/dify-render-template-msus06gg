@@ -341,6 +341,15 @@ projects:
             envVars:
               - key: SERVER_PORT
                 value: "5002"
+              # The daemon validates these at startup and exits 1 when they
+              # are empty ("plugin remote installing host is empty"). The
+              # official compose always sets them; they configure the plugin
+              # remote-debugging listener, which stays unused here — the
+              # service is private, nothing routes to 5003.
+              - key: PLUGIN_REMOTE_INSTALLING_HOST
+                value: "0.0.0.0"
+              - key: PLUGIN_REMOTE_INSTALLING_PORT
+                value: "5003"
               # Shared secret #1 — api/worker read this back as
               # PLUGIN_DAEMON_KEY. Generated once, here, so no drift.
               - key: SERVER_KEY
