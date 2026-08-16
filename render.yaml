@@ -15,7 +15,7 @@
 #      plugins; only the daemon can install and run them.
 #
 # VERSION PAIRING (load-bearing — never bump one side alone):
-#   langgenius/dify-api:1.14.2  ⇔  langgenius/dify-plugin-daemon:0.6.1-local
+#   langgenius/dify-api:1.16.1  ⇔  langgenius/dify-plugin-daemon:0.6.3-local
 
 previews:
   generation: off
@@ -32,7 +32,7 @@ projects:
             plan: standard
             region: oregon
             image:
-              url: docker.io/langgenius/dify-api:1.14.2
+              url: docker.io/langgenius/dify-api:1.16.1
             healthCheckPath: /health
             autoDeployTrigger: off
             initialDeployHook: psql $DATABASE_URL -c 'CREATE EXTENSION IF NOT EXISTS vector;'
@@ -189,7 +189,7 @@ projects:
             plan: standard
             region: oregon
             image:
-              url: docker.io/langgenius/dify-api:1.14.2
+              url: docker.io/langgenius/dify-api:1.16.1
             autoDeployTrigger: off
             envVars:
               - key: MODE
@@ -314,7 +314,7 @@ projects:
             plan: starter
             region: oregon
             image:
-              url: docker.io/langgenius/dify-web:1.14.2
+              url: docker.io/langgenius/dify-web:1.16.1
             autoDeployTrigger: off
             envVars:
               # Must match dify-api's CONSOLE_API_URL — see the same-site
@@ -348,7 +348,7 @@ projects:
             plan: standard        # builds Python envs per plugin; 512MB OOMs
             region: oregon
             image:
-              url: docker.io/langgenius/dify-plugin-daemon:0.6.1-local
+              url: docker.io/langgenius/dify-plugin-daemon:0.6.3-local
             autoDeployTrigger: off
             # Disk stays HERE (plugins are reinstallable; api's disk was the
             # one that cost us zero-downtime deploys on the user path).
