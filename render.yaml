@@ -382,6 +382,20 @@ projects:
                   property: database
               - key: DB_SSL_MODE
                 value: require     # Render Postgres refuses plaintext
+              # ── Redis (same dify-kv the api and worker use) ──
+              # The daemon requires it at launch; without these it dials
+              # "tcp :0" and panics ("init redis client failed"). Compose
+              # supplies them via shared env files, which is easy to miss.
+              - key: REDIS_HOST
+                fromService:
+                  name: dify-kv
+                  type: keyvalue
+                  property: host
+              - key: REDIS_PORT
+                fromService:
+                  name: dify-kv
+                  type: keyvalue
+                  property: port
               # ── plugin storage layout (must agree with mountPath) ──
               - key: PLUGIN_STORAGE_TYPE
                 value: local
