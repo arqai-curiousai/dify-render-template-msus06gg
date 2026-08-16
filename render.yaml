@@ -76,7 +76,7 @@ projects:
               # Internal consumers (plugin daemon) fetch files over Render's
               # private network — no reason to round-trip the public edge.
               - key: INTERNAL_FILES_URL
-                value: http://dify-api:5001
+                value: https://dify-api.vedicsamhita.in
               - key: CONSOLE_WEB_URL
                 value: https://dify.vedicsamhita.in
               - key: APP_WEB_URL
@@ -162,7 +162,7 @@ projects:
                 value: "false"
               # ── Plugin daemon wiring ──
               - key: PLUGIN_DAEMON_URL
-                value: http://dify-plugin-daemon:5002
+                value: http://dify-plugin-daemon-l5ig:5002
               - key: PLUGIN_DAEMON_KEY
                 fromService:
                   name: dify-plugin-daemon
@@ -287,7 +287,7 @@ projects:
                 value: "false"
               # ── Plugin daemon wiring (worker runs the async half) ──
               - key: PLUGIN_DAEMON_URL
-                value: http://dify-plugin-daemon:5002
+                value: http://dify-plugin-daemon-l5ig:5002
               - key: PLUGIN_DAEMON_KEY
                 fromService:
                   name: dify-plugin-daemon
@@ -376,7 +376,7 @@ projects:
               - key: DIFY_INNER_API_KEY
                 generateValue: true
               - key: DIFY_INNER_API_URL
-                value: http://dify-api:5001
+                value: https://dify-api.vedicsamhita.in
               # ── its own database (the daemon insists) ──
               - key: DB_HOST
                 fromDatabase:
