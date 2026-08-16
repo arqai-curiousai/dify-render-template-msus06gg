@@ -49,36 +49,28 @@ projects:
                 value: INFO
               - key: SECRET_KEY
                 generateValue: true
+              # SAME-SITE DOMAINS — load-bearing for login. Dify 1.14.2
+              # delivers auth tokens as SameSite=Lax cookies (hardcoded in
+              # api/libs/token.py). onrender.com is on the Public Suffix
+              # List, so dify-web-*.onrender.com and dify-api-*.onrender.com
+              # are DIFFERENT SITES and the browser refuses the cookies —
+              # login succeeds server-side and bounces in the browser.
+              # Sibling subdomains of vedicsamhita.in are one site; the
+              # cookies flow. Do not revert these to RENDER_EXTERNAL_URL.
               - key: CONSOLE_API_URL
-                fromService:
-                  name: dify-api
-                  type: web
-                  envVarKey: RENDER_EXTERNAL_URL
+                value: https://dify-api.vedicsamhita.in
               - key: SERVICE_API_URL
-                fromService:
-                  name: dify-api
-                  type: web
-                  envVarKey: RENDER_EXTERNAL_URL
+                value: https://dify-api.vedicsamhita.in
               - key: FILES_URL
-                fromService:
-                  name: dify-api
-                  type: web
-                  envVarKey: RENDER_EXTERNAL_URL
+                value: https://dify-api.vedicsamhita.in
+              # Internal consumers (plugin daemon) fetch files over Render's
+              # private network — no reason to round-trip the public edge.
               - key: INTERNAL_FILES_URL
-                fromService:
-                  name: dify-api
-                  type: web
-                  envVarKey: RENDER_EXTERNAL_URL
+                value: http://dify-api:5001
               - key: CONSOLE_WEB_URL
-                fromService:
-                  name: dify-web
-                  type: web
-                  envVarKey: RENDER_EXTERNAL_URL
+                value: https://dify.vedicsamhita.in
               - key: APP_WEB_URL
-                fromService:
-                  name: dify-web
-                  type: web
-                  envVarKey: RENDER_EXTERNAL_URL
+                value: https://dify.vedicsamhita.in
               - key: DATABASE_URL
                 fromDatabase:
                   name: dify-db
@@ -315,16 +307,13 @@ projects:
               url: docker.io/langgenius/dify-web:1.14.2
             autoDeployTrigger: off
             envVars:
+              # Must match dify-api's CONSOLE_API_URL — see the same-site
+              # cookie note there. The console calls this origin from the
+              # browser, so it has to be the custom domain, not onrender.com.
               - key: CONSOLE_API_URL
-                fromService:
-                  name: dify-api
-                  type: web
-                  envVarKey: RENDER_EXTERNAL_URL
+                value: https://dify-api.vedicsamhita.in
               - key: APP_API_URL
-                fromService:
-                  name: dify-api
-                  type: web
-                  envVarKey: RENDER_EXTERNAL_URL
+                value: https://dify-api.vedicsamhita.in
               - key: MARKETPLACE_API_URL
                 value: https://marketplace.dify.ai
               - key: MARKETPLACE_URL
