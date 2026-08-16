@@ -57,6 +57,16 @@ projects:
               # login succeeds server-side and bounces in the browser.
               # Sibling subdomains of vedicsamhita.in are one site; the
               # cookies flow. Do not revert these to RENDER_EXTERNAL_URL.
+              # Dify validates a CSRF double-submit on EVERY console request,
+              # GETs included: the web app's JS must read the csrf cookie and
+              # echo it as a header. JS on dify.vedicsamhita.in cannot read a
+              # host-only cookie set by dify-api.vedicsamhita.in, so without
+              # a shared cookie domain every request 401s after login.
+              # Domain-wide cookies do reach the apex (the Vercel site) too —
+              # acceptable for our own trusted app; tighten later by moving
+              # the api under api.dify.vedicsamhita.in and narrowing this.
+              - key: COOKIE_DOMAIN
+                value: vedicsamhita.in
               - key: CONSOLE_API_URL
                 value: https://dify-api.vedicsamhita.in
               - key: SERVICE_API_URL
