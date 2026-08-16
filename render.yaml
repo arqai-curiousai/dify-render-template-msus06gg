@@ -324,6 +324,14 @@ projects:
                 value: https://dify-api.vedicsamhita.in
               - key: APP_API_URL
                 value: https://dify-api.vedicsamhita.in
+              # MUST mirror dify-api's COOKIE_DOMAIN. The frontend picks
+              # which csrf cookie NAME to read from this value
+              # (web/config/index.ts CSRF_COOKIE_NAME): with it -> csrf_token
+              # (what the api now sets); without it -> __Host-csrf_token,
+              # which no longer exists -> empty X-CSRF-Token header -> every
+              # request 401s with "CSRF token is missing or invalid".
+              - key: NEXT_PUBLIC_COOKIE_DOMAIN
+                value: vedicsamhita.in
               - key: MARKETPLACE_API_URL
                 value: https://marketplace.dify.ai
               - key: MARKETPLACE_URL
